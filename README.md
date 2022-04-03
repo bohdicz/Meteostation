@@ -16,12 +16,13 @@ Funkce meteostanice:
 * Snímání okolního světla
 
 Vývoj:
-* 03.04.2022 - Úprava kódu pro optimalizaci připojení k wifi
+
 * 06.01.2022 - Zprovoznení "Partial Update" - Informační bloky s teplotou, vlhkostí a časem se na displeji meteostanice aktualizují nezávisle na sobě a bez nežádoucího probliknutí LCD při překreslení obsahu.
 * 20.01.2022 - OpenWeather - Nově získáváme informace o teplotě a vlhkosti z internetové předpovědi počasí www.openweathermaps.org
 * 15.02.2022 - Zobrazení venkovního počasí pomocí bitmap.
 * 25.02.2022 - Začlenění funkce geoip. Získáme název města a státu dle přístupového bodu do internetu. To následně použijeme při získávání informací o počasí.
-* 06.03.2022 - realizace krabičky.
+* 06.03.2022 - Realizace krabičky + napájení čidel do stohu
+* 03.04.2022 - Úprava kódu pro optimalizaci připojení k wifi
 
 ### Zdroje
 
