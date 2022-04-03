@@ -12,8 +12,8 @@
 uint myMeasureDelay = 20000;		// èetnost mìøení
 
 // WiFi - název SSDI wifi sítì a heslo k ní
-const char* ssid = "mib";					//Zadání názvu sítì do promìnné SSID.
-const char* password = "aldebaranoska";		//Zadání hesla k síti.
+const char* ssid = "BBi13";					//Zadání názvu sítì do promìnné SSID.
+const char* password = "smashlandwantedineurope";				//Zadání hesla k síti.
 
 // pøipojení potøebnıch knihoven k modulu BME280, BH1750, knihovnu pro wifi.
 #include <Wire.h>
@@ -60,6 +60,8 @@ ESP32Time rtc;
 
 // nastavení adresy senzoru BME280
 #define BME280_ADRESA (0x76)
+
+// nastavení adresy senzoru intenzity svìtla BH1750
 #define BH1750_ADRESA (0x23)
 
 // inicializace senzoru BME280 a senzoru BH1750 z knihovny
@@ -79,7 +81,7 @@ const char mqtt_client[] = "bobo-esp32-home";
 String jsonBuffer;
 // Alokace pamìti pro JSON documenty - menší blok znamená, e se
 // data nenaètou celá! Mìnit opatrnì.
- // Use arduinojson.org/v6/assistant to compute the capacity.
+// Use arduinojson.org/v6/assistant to compute the capacity.
 DynamicJsonDocument doc(1024);
 DynamicJsonDocument geo(512);
 
@@ -104,6 +106,9 @@ byte myHumidity;
 int myTemperature;
 uint myLux;
 
+int tempOutdoor;
+byte hmdOutdoor;
+
 
 //setup se provadi pouze jednou v behu programu a slouzi k nastaveni zakladnich
 void setup() {
@@ -111,9 +116,6 @@ void setup() {
 	// Nastavuje datovı tok pro pøenos v bitech za vteøinu na sériové lince
 	// Vıstup vyuíváme pro zobrazení diagnostickıch dat
 	Serial.begin(9600);
-
-	// Základní nastavení LCD
-	displaySetup();
 
 	// Nastavení èidla teploty, tlaku a vlhkosti
 	if (!bme.begin(BME280_ADRESA)) {
@@ -127,7 +129,7 @@ void setup() {
 	if (!luxSenzor.begin())
 	{
 		Serial.println(F("BH1750 senzor nenalezen, zkontrolujte zapojeni nebo adresu senzoru!"));
-		while (1);
+		//while (1);
 	}
 	else
 	{
@@ -138,19 +140,22 @@ void setup() {
 	Procedura pøipojení k wifi, mqtt a ntp
 	Dokud nìní úspìšná, program nebìí dále!
 	*/
-	Serial.print("Connecting WiFI");
-	while (!wifiSetup())
+	wifiSetup();
+
+		// prodleva pro správné propojení
+		delay(2000);
 		
 		// po pøipojení se spoj s MQTT a synchronizuj èas
 		client.setServer(mqtt_server, 1883);
 		client.setCallback(callback);
 
-		// Nastavení posunu èasu o hodinu
-		timeClient.setTimeOffset(3600);
-		timeClient.begin();
+		// nastavení DST - zmìnu letního/zimního èasu
+		//setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
+		//tzset();
 
-		// prodleva pro správné propojení
-		delay(2000);
+		// Nastavení posunu èasu o hodinu +1, respektování letního èasu (DST), NTP servery
+		configTime(3600, 3600, "tik.cesnet.cz", "tak.cesnet.cz");
+		timeClient.begin();
 
 		// Získání èasu a prvotní nastavení RTC
 		updateRtc();
@@ -170,24 +175,23 @@ void setup() {
 
 	// uloíme aktuální dobu bìhu arduina pro potøebu rùznıch period aktivit.
 	lastMillis = millis();
+
+	// Základní nastavení LCD
+	displaySetup();
+
 }
 
 
 bool wifiSetup() {
 
 	WiFi.begin(ssid, password);		// Zahájí pøipojování k síti.
-
-
-	// snaíme se neustále o pøipojení, jinak vypisujeme teèky "..."
-	// po pøipojení zobrazíme informace o síové adrese a bránì.
-	if (WiFi.status() != WL_CONNECTED) {
-		delay(1000);
+	Serial.print("Connecting WiFI");
+	
+	while (WiFi.status() != WL_CONNECTED) {
 		Serial.print(".");
-		//Serial.println(ssid);
-		delay(2000);
-		return false;
+		delay(500);
 	}
-	else {
+
 		Serial.print("connected: ");
 		Serial.println(ssid);
 
@@ -197,7 +201,6 @@ bool wifiSetup() {
 		Serial.print("GW: ");
 		Serial.println(WiFi.gatewayIP());
 		return true;
-	}
 }
 
 void displaySetup() {
@@ -387,7 +390,7 @@ void getInternetWeather() {
 		Serial.println(iconNumber);
 		
 		// LCD - vykreslení externí teploty
-		int tempOutdoor = main["temp"];
+		tempOutdoor = main["temp"];
 		Serial.print("Teplota ext.: ");
 		Serial.println(tempOutdoor);
 
@@ -405,9 +408,9 @@ void getInternetWeather() {
 		//	display.fillRect(0, 0, GxEPD_WIDTH,GxEPD_HEIGHT, GxEPD_WHITE);
 		display.fillRect(230, 105, 45, 30, GxEPD_WHITE);
 		display.setCursor(230, 105);
-		int tempHumidity = main["humidity"];
+		hmdOutdoor = main["humidity"];
 		display.setTextSize(fontHmdSize);
-		display.print(tempHumidity);
+		display.print(hmdOutdoor);
 		display.setTextSize(0);
 		display.print("%");
 		display.updateWindow(230, 105, 45, 30, true);
@@ -433,7 +436,7 @@ void getLocalSensorsData() {
 
 	// Zobrazení hodnoty lux
 	Serial.print("Lux: ");
-	Serial.print(myLux);
+	Serial.println(myLux);
 
 	// vıpis všech dostupnıch informací ze senzoru BMP
 	// vıpis teploty
@@ -508,6 +511,9 @@ void getLocalSensorsData() {
 	client.publish("/home/meteostanice/humidity", String(myHumidity).c_str(), true);
 	client.publish("/home/meteostanice/lux", String(myLux).c_str(), true);
 	client.publish("/home/meteostanice/runtime", String(myRuntime).c_str(), true);
+
+	client.publish("/home/meteostanice/temperature_out", String(tempOutdoor).c_str(), true);
+	client.publish("/home/meteostanice/humidity_out", String(hmdOutdoor).c_str(), true);
 }
 
 void callback(char* topic, byte* payload, unsigned int length)
